@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Who's the Imposter? — Online</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:linear-gradient(135deg,#14142b,#29295a);color:#fff;min-height:100vh}
+.wrap{max-width:920px;margin:auto;padding:24px 16px}.card{background:#ffffff12;backdrop-filter:blur(12px);border:1px solid #ffffff20;border-radius:22px;padding:24px;box-shadow:0 20px 60px #0005}
+h1{font-size:clamp(30px,7vw,56px);margin:0 0 5px;text-align:center}.sub{text-align:center;color:#d8d8f5;margin:0 0 22px}.center{text-align:center}
+button,input,select,textarea{font:inherit;border-radius:12px;border:0;padding:12px 14px}button{background:#ffd166;color:#17172b;font-weight:800;cursor:pointer}button:hover{filter:brightness(1.08)}button.secondary{background:#fff}button.danger{background:#ff6b6b;color:#fff}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:150px}input,select,textarea{width:100%;background:#fff;color:#222}.hidden{display:none!important}
+.pill{display:inline-block;padding:7px 12px;border-radius:999px;background:#ffffff1a;margin:4px}.bigword{font-size:52px;font-weight:900;margin:20px 0}.role{font-size:22px;font-weight:800}.players{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}.player{padding:14px;border-radius:14px;background:#ffffff0e;border:1px solid #ffffff18}.timer{font-size:48px;font-weight:900}.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}.choices button{background:#fff}.note{background:#0003;border-radius:14px;padding:14px;color:#ddd}.status{margin:10px 0;padding:10px;border-radius:10px;background:#0003;color:#ddd}.success{color:#8df0b0}.dangerText{color:#ff9b9b}.small{font-size:13px;color:#aaa}.score{font-size:28px;font-weight:900}.footer{text-align:center;color:#aaa;font-size:12px;margin-top:15px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111d;color:#fff;padding:12px 18px;border-radius:12px;display:none;z-index:10}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+<h1>🕵️ WHO'S THE IMPOSTER?</h1><p class="sub">Online multiplayer party game</p>
+
+<section id="home">
+  <div class="row">
+    <button onclick="createRoom()">🎮 Create Game</button>
+    <button class="secondary" onclick="show('join')">🚪 Join Game</button>
+  </div>
+  <div class="note" style="margin-top:16px">
+    <b>How online play works:</b> the host creates a room and shares the generated link. Everyone joins from their own phone or laptop. The host keeps the game open for the whole session.
+  </div>
+</section>
+
+<section id="join" class="hidden">
+  <h2>🚪 Join a Game</h2>
+  <input id="joinName" placeholder="Your name" maxlength="24">
+  <br><br><button onclick="joinRoom()">Join</button>
+  <button class="secondary" onclick="show('home')">Back</button>
+  <p class="small">If someone sent you a game link, opening that link will automatically put you on the join screen.</p>
+</section>
+
+<section id="hostSetup" class="hidden">
+  <h2>👑 Host Lobby</h2>
+  <div class="status">Room code: <b id="roomCode"></b></div>
+  <div class="note">Share this link with your team:</div>
+  <input id="shareLink" readonly onclick="this.select()">
+  <br><br><button class="secondary" onclick="copyLink()">📋 Copy Link</button>
+  <h3>Players (<span id="hostCount">1</span>)</h3>
+  <div id="hostPlayers" class="players"></div>
+  <div class="row">
+    <select id="category"><option value="mixed">🎲 Mixed</option><option value="food">🍔 Food</option><option value="animals">🐾 Animals</option><option value="travel">✈️ Travel</option><option value="movies">🎬 Movies & TV</option><option value="things">🤪 Random Things</option></select>
+    <select id="rounds"><option>3</option><option selected>5</option><option>7</option><option>10</option></select>
+  </div><br>
+  <button id="startBtn" onclick="hostStart()" disabled>🚀 Start Game (need 4+ players)</button>
+  <p class="small">Keep this browser tab open. It is the host/server for this room.</p>
+</section>
+
+<section id="lobby" class="hidden center">
+  <h2>🎉 You're in!</h2><div class="pill">Room <b id="lobbyCode"></b></div>
+  <h3>Players</h3><div id="lobbyPlayers" class="players"></div>
+  <p>Waiting for the host to start...</p>
+</section>
+
+<section id="reveal" class="hidden center">
+  <div class="pill" id="roundLabel"></div><h2 id="revealTitle"></h2>
+  <p id="revealInstruction">Tap to privately reveal your role.</p>
+  <button id="revealBtn" onclick="revealSecret()">👀 Reveal My Secret</button>
+  <div id="secretBox" class="hidden"><div id="roleText" class="role"></div><div id="secretWord" class="bigword"></div><p id="secretHint"></p></div>
+</section>
+
+<section id="clues" class="hidden center">
+  <div class="pill" id="clueRound"></div><h2>💬 Clue Time!</h2><p>Everyone gives ONE clue out loud. Don't say the secret word.</p>
+  <div class="timer" id="timer">60</div><button onclick="startTimer()">⏱ Start 60s</button>
+  <div id="clueStatus" class="status"></div><button id="voteOpenBtn" onclick="hostOpenVote()" class="hidden">🗳️ Open Voting</button>
+</section>
+
+<section id="vote" class="hidden center">
+  <div class="pill">🗳️ Voting</div><h2>Who is the Imposter?</h2><p id="voteInstruction"></p>
+  <div class="choices" id="voteChoices"></div>
+  <div id="voteProgress" class="status"></div>
+</section>
+
+<section id="result" class="hidden center">
+  <div class="pill" id="resultRound"></div><h2 id="resultTitle"></h2><p id="resultText"></p><div class="bigword" id="resultWord"></div>
+  <div id="guessArea" class="hidden"><h3>😈 Imposter final chance</h3><p>Guess the secret word on your device.</p><div class="row"><input id="guessInput" placeholder="Your guess"><button onclick="sendGuess()">Guess</button></div></div>
+  <div id="resultScores"></div>
+  <button id="nextBtn" onclick="hostNextRound()" class="hidden">Next Round ➜</button>
+</section>
+
+<section id="final" class="hidden center"><h2>🏆 Game Over!</h2><div id="winner" class="score"></div><div id="finalScores"></div><br><button onclick="location.href=location.origin+location.pathname">🔄 New Game</button></section>
+<div class="footer">Made for team fun. No accounting required. 😄</div>
+</div></div><div id="toast"></div>
+
+<script>
+const WORDS={
+food:["Pizza","Burger","Ice cream","Sushi","Popcorn","Pancakes","Tacos","Chocolate","Donut","French fries","Watermelon","Coffee"],
+animals:["Penguin","Elephant","Giraffe","Dolphin","Kangaroo","Panda","Tiger","Cat","Dog","Octopus","Koala","Lion"],
+travel:["Airport","Beach","Hotel","Passport","Suitcase","Cruise ship","Mountain","Theme park","Train station","Desert","Island","Road trip"],
+movies:["Harry Potter","Titanic","The Lion King","Frozen","Spider-Man","Jurassic Park","Toy Story","The Avengers","Shrek","Finding Nemo","Wednesday","Home Alone"],
+things:["Umbrella","Toothbrush","Laptop","Alarm clock","Backpack","Bicycle","Candle","Sunglasses","Pillow","Remote control","Balloon","Key"]};
+WORDS.mixed=[...WORDS.food,...WORDS.animals,...WORDS.travel,...WORDS.movies,...WORDS.things];
+
+let peer=null,hostConn=null,host=false,roomId="",me="",connections={},players={},game={},myVoteDone=false,timerInt=null;
+
+function show(id){document.querySelectorAll("section").forEach(s=>s.classList.add("hidden"));document.getElementById(id).classList.remove("hidden")}
+function toast(t){const x=document.getElementById("toast");x.textContent=t;x.style.display="block";setTimeout(()=>x.style.display="none",2500)}
+function clean(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function makeCode(){return Math.random().toString(36).slice(2,7).toUpperCase()}
+
+function createRoom(){
+ host=true;roomId=makeCode();me="Host";players={host:{id:"host",name:"Host",isHost:true}};
+ peer=new Peer("imposter-"+roomId.toLowerCase()+"-"+Math.random().toString(36).slice(2,7));
+ peer.on("open",()=>{const link=location.href.split("?")[0]+"?room="+encodeURIComponent(roomId)+"&host="+encodeURIComponent(peer.id);document.getElementById("roomCode").textContent=roomId;document.getElementById("shareLink").value=link;updateHostLobby();show("hostSetup")});
+ peer.on("connection",conn=>setupHostConn(conn));
+ peer.on("error",e=>toast("Connection error: "+e.type));
+}
+function setupHostConn(conn){
+ connections[conn.peer]=conn;
+ conn.on("open",()=>conn.on("data",msg=>hostMessage(conn,msg)));
+ conn.on("close",()=>{delete connections[conn.peer];for(const id in players)if(players[id].peer===conn.peer)delete players[id];broadcast({type:"lobby",players:Object.values(players)});updateHostLobby()});
+}
+function hostMessage(conn,msg){
+ if(msg.type==="join"){
+   const name=(msg.name||"Player").trim().slice(0,24);
+   if(Object.values(players).some(p=>p.name.toLowerCase()===name.toLowerCase())){conn.send({type:"error",message:"That name is already taken."});return}
+   const id="p"+Math.random().toString(36).slice(2,9);players[id]={id,name,peer:conn.peer};
+   conn.send({type:"joined",id,room:roomId});broadcast({type:"lobby",players:Object.values(players).map(p=>({id:p.id,name:p.name,isHost:p.isHost}))});updateHostLobby();
+ }
+ if(msg.type==="vote") { if(!game.votes)game.votes={}; if(!game.votes[msg.from]){game.votes[msg.from]=msg.target;broadcast({type:"voteProgress",count:Object.keys(game.votes).length,total:Object.keys(players).length-1});if(Object.keys(game.votes).length===Object.keys(players).length-1)finishVote()}}
+ if(msg.type==="guess" && game.imposter===msg.from){const correct=String(msg.guess).trim().toLowerCase()===game.word.toLowerCase();if(correct)game.scores[msg.from]=(game.scores[msg.from]||0)+6;broadcast({type:"guessResult",correct,guesser:players[msg.from]?.name});setTimeout(()=>sendResults(),500)}
+}
+function broadcast(msg){Object.values(connections).forEach(c=>{try{c.send(msg)}catch(e){}})}
+function updateHostLobby(){document.getElementById("hostCount").textContent=Object.keys(players).length;document.getElementById("hostPlayers").innerHTML=Object.values(players).map(p=>`<div class="player">👤 ${clean(p.name)}${p.isHost?" 👑":""}</div>`).join("");document.getElementById("startBtn").disabled=Object.keys(players).length<4}
+function copyLink(){navigator.clipboard.writeText(document.getElementById("shareLink").value);toast("Game link copied!")}
+function hostStart(){
+ if(Object.keys(players).length<4)return;
+ game={round:1,total:+document.getElementById("rounds").value,category:document.getElementById("category").value,scores:{},votes:{},word:"",imposter:"",phase:"reveal"};
+ Object.keys(players).forEach(id=>game.scores[id]=0);startHostRound();
+}
+function startHostRound(){
+ const pool=WORDS[game.category];game.word=pool[Math.floor(Math.random()*pool.length)];
+ const ids=Object.keys(players).filter(id=>!players[id].isHost);game.imposter=ids[Math.floor(Math.random()*ids.length)];game.votes={};game.phase="reveal";
+ broadcast({type:"round",round:game.round,total:game.total,phase:"reveal"});
+ renderHostReveal();
+}
+function renderHostReveal(){show("reveal");document.getElementById("roundLabel").textContent=`Round ${game.round} of ${game.total}`;document.getElementById("revealTitle").textContent="Host controls the game";document.getElementById("revealInstruction").textContent="Players are privately receiving their roles. Start the clue phase when everyone is ready.";document.getElementById("revealBtn").textContent="💬 Start Clue Phase";document.getElementById("revealBtn").onclick=hostStartClues;document.getElementById("secretBox").classList.add("hidden")}
+function hostStartClues(){game.phase="clues";broadcast({type:"phase",phase:"clues",round:game.round});renderClues(true)}
+function renderClues(isHost=false){show("clues");document.getElementById("clueRound").textContent=`Round ${game.round}`;document.getElementById("clueStatus").textContent=isHost?"Clues are happening now. When everyone has spoken, open voting.":"Everyone gives one clue out loud. Watch the clues carefully!";document.getElementById("voteOpenBtn").classList.toggle("hidden",!isHost)}
+function hostOpenVote(){game.phase="vote";game.votes={};broadcast({type:"phase",phase:"vote"});renderVoteHost()}
+function renderVoteHost(){show("vote");document.getElementById("voteInstruction").textContent="Players are voting from their own devices.";document.getElementById("voteChoices").innerHTML="";document.getElementById("voteProgress").textContent=`0 / ${Object.keys(players).length-1} votes received`}
+function finishVote(){
+ const counts={};Object.values(game.votes).forEach(x=>counts[x]=(counts[x]||0)+1);const max=Math.max(...Object.values(counts));const top=Object.keys(counts).filter(x=>counts[x]===max);
+ game.caught=top.length===1&&top[0]===game.imposter;
+ if(game.caught)Object.keys(players).forEach(id=>{if(id!==game.imposter)game.scores[id]+=2});
+ else game.scores[game.imposter]+=4;
+ game.phase="result";sendResults();
+}
+function sendResults(){
+ broadcast({type:"result",round:game.round,word:game.word,imposter:game.imposter,caught:game.caught,scores:game.scores,players:Object.fromEntries(Object.entries(players).map(([k,v])=>[k,v.name]))});
+ renderResult({round:game.round,word:game.word,imposter:game.imposter,caught:game.caught,scores:game.scores,players:Object.fromEntries(Object.entries(players).map(([k,v])=>[k,v.name]))},true)
+}
+function renderResult(r,isHost=false){
+ show("result");document.getElementById("resultRound").textContent=`Round ${r.round}`;
+ const impName=r.players[r.imposter];document.getElementById("resultTitle").textContent=r.caught?"🎉 IMPOSTER CAUGHT!":"😈 IMPOSTER ESCAPED!";
+ document.getElementById("resultText").textContent=r.caught?`${impName} was the Imposter! Everyone else gets 2 points.`:`The vote missed! ${impName} was the Imposter and gets 4 points.`;
+ document.getElementById("resultWord").textContent=`Secret: ${r.word}`;
+ document.getElementById("resultScores").innerHTML=Object.entries(r.scores).sort((a,b)=>b[1]-a[1]).map(([id,s])=>`<span class="pill">${clean(r.players[id])}: <b>${s}</b></span>`).join("");
+ document.getElementById("guessArea").classList.toggle("hidden",!(r.caught&&(!host&&myId===r.imposter)));
+ document.getElementById("nextBtn").classList.toggle("hidden",!isHost);
+}
+function hostNextRound(){if(game.round>=game.total){finishGame();return}game.round++;startHostRound()}
+function finishGame(){const sorted=Object.entries(game.scores).sort((a,b)=>b[1]-a[1]);const names=Object.fromEntries(Object.entries(players).map(([k,v])=>[k,v.name]));broadcast({type:"final",scores:game.scores,names});renderFinal(game.scores,names)}
+function renderFinal(scores,names){show("final");const sorted=Object.entries(scores).sort((a,b)=>b[1]-a[1]);document.getElementById("winner").textContent=`🏆 ${clean(names[sorted[0][0]])} — ${sorted[0][1]} points`;document.getElementById("finalScores").innerHTML=sorted.map(([id,s],i)=>`<div class="player" style="margin:8px">#${i+1} <b>${clean(names[id])}</b><br>${s} points</div>`).join("")}
+
+let myId="";
+function joinRoom(){
+ const name=document.getElementById("joinName").value.trim();if(!name){alert("Enter your name.");return}
+ const params=new URLSearchParams(location.search),code=params.get("room"),hostPeer=params.get("host");
+ if(!code||!hostPeer){alert("Ask the host for the game link.");return}
+ me=name;roomId=code;host=false;show("lobby");document.getElementById("lobbyCode").textContent=roomId;
+ peer=new Peer();peer.on("open",()=>{hostConn=peer.connect(hostPeer,{reliable:true});hostConn.on("open",()=>hostConn.send({type:"join",name}));hostConn.on("data",clientMessage);hostConn.on("close",()=>toast("Host disconnected."))});peer.on("error",e=>toast("Connection error: "+e.type))
+}
+function clientMessage(msg){
+ if(msg.type==="error"){alert(msg.message);return}
+ if(msg.type==="joined"){myId=msg.id;return}
+ if(msg.type==="lobby"){document.getElementById("lobbyPlayers").innerHTML=msg.players.map(p=>`<div class="player">👤 ${clean(p.name)}${p.isHost?" 👑":""}</div>`).join("");return}
+ if(msg.type==="round"){game.round=msg.round;game.total=msg.total;game.phase=msg.phase;mySecret=null;show("reveal");document.getElementById("roundLabel").textContent=`Round ${msg.round} of ${msg.total}`;document.getElementById("revealTitle").textContent="Your secret is ready";document.getElementById("revealInstruction").textContent="Tap the button to see your private role.";document.getElementById("revealBtn").textContent="👀 Reveal My Secret";document.getElementById("revealBtn").onclick=revealSecret;document.getElementById("secretBox").classList.add("hidden");return}
+ if(msg.type==="secret"){mySecret=msg;if(!document.getElementById("secretBox").classList.contains("hidden"))displaySecret();return}
+ if(msg.type==="phase"){game.phase=msg.phase;if(msg.players)lastPlayers=msg.players;if(msg.phase==="clues")renderClues(false);if(msg.phase==="vote")renderVoteClient();return}
+ if(msg.type==="voteProgress"){document.getElementById("voteProgress").textContent=`${msg.count} / ${msg.total} votes received`;return}
+ if(msg.type==="result"){game.result=msg;renderResult(msg,false);return}
+ if(msg.type==="guessResult"){document.getElementById("resultText").innerHTML+=msg.correct?`<br><br>😈 ${clean(msg.guesser)} guessed correctly and gets 6 bonus points!`:`<br><br>❌ ${clean(msg.guesser)} guessed incorrectly.`;document.getElementById("guessArea").classList.add("hidden");return}
+ if(msg.type==="final")renderFinal(msg.scores,msg.names);
+}
+let mySecret=null;
+function revealSecret(){
+ document.getElementById("secretBox").classList.remove("hidden");
+ if(mySecret){displaySecret();return}
+ // Host sends role data individually at round start; fallback requests it.
+ if(hostConn)hostConn.send({type:"needSecret",from:myId});
+}
+function displaySecret(){
+ if(!mySecret)return;
+ document.getElementById("roleText").textContent=mySecret.imposter?"😈 You are the IMPOSTER!":"🕵️ You are a Detective";
+ document.getElementById("secretWord").textContent=mySecret.imposter?"???":mySecret.word;
+ document.getElementById("secretHint").textContent=mySecret.imposter?"Blend in and try to figure out the secret word from everyone else's clues.":"Remember this word and give a clue about it. Don't say it directly!";
+}
+function sendSecret(conn,id){
+ conn.send({type:"secret",imposter:id===game.imposter,word:id===game.imposter?null:game.word});
+}
+function renderVoteClient(){
+ show("vote");myVoteDone=false;document.getElementById("voteInstruction").textContent="Choose one player. Your vote is private.";
+ const opts=Object.entries(lastPlayers).filter(([id])=>id!==myId).map(([id,p])=>`<button onclick="castClientVote('${id}')">🗳️ ${clean(p.name||p)}</button>`).join("");
+ document.getElementById("voteChoices").innerHTML=opts;document.getElementById("voteProgress").textContent="Waiting for votes..."
+}
+let lastPlayers={};
+function castClientVote(target){if(myVoteDone)return;myVoteDone=true;hostConn.send({type:"vote",from:myId,target});document.getElementById("voteChoices").innerHTML="<div class='status'>✅ Vote submitted. Waiting for everyone...</div>"}
+function sendGuess(){const g=document.getElementById("guessInput").value.trim();if(g)hostConn.send({type:"guess",from:myId,guess:g})}
+function startTimer(){let t=60;document.getElementById("timer").textContent=t;clearInterval(timerInt);timerInt=setInterval(()=>{t--;document.getElementById("timer").textContent=t;if(t<=0)clearInterval(timerInt)},1000)}
+window.addEventListener("load",()=>{
+ const q=new URLSearchParams(location.search);if(q.get("room")&&q.get("host"))show("join");
+});
+const oldSetupHostConn=setupHostConn;
+setupHostConn=function(conn){
+ connections[conn.peer]=conn;
+ conn.on("open",()=>conn.on("data",msg=>{
+   if(msg.type==="needSecret"){const id=Object.keys(players).find(k=>players[k].peer===conn.peer);if(id)sendSecret(conn,id);return}
+   hostMessage(conn,msg);
+ }));
+ conn.on("close",()=>{delete connections[conn.peer];for(const id in players)if(players[id].peer===conn.peer)delete players[id];broadcast({type:"lobby",players:Object.values(players)});updateHostLobby()});
+};
+const oldStartHostRound=startHostRound;
+startHostRound=function(){
+ oldStartHostRound();
+ Object.entries(players).forEach(([id,p])=>{if(!p.isHost&&connections[p.peer])sendSecret(connections[p.peer],id)});
+ lastPlayers=players;
+};
+const oldHostStartClues=hostStartClues;
+hostStartClues=function(){game.phase="clues";broadcast({type:"phase",phase:"clues",round:game.round});renderClues(true)};
+const oldRenderResult=renderResult;
+renderResult=function(r,isHost){lastPlayers=Object.fromEntries(Object.entries(r.players).map(([id,name])=>[id,{name}]));oldRenderResult(r,isHost)};
+const oldHostOpenVote=hostOpenVote;
+hostOpenVote=function(){game.phase="vote";game.votes={};broadcast({type:"phase",phase:"vote",players:Object.fromEntries(Object.entries(players).map(([id,p])=>[id,{name:p.name}]))});lastPlayers=players;renderVoteHost()};
+</script>
+</body>
+</html>
