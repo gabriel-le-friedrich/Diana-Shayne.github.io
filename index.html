@@ -175,7 +175,7 @@
       </div>
     </div>
     <div id="toast"></div>
-    <script>
+        <script>
       const WORDS = {
         food: ["Pizza", "Burger", "Ice cream", "Sushi", "Popcorn", "Pancakes", "Tacos", "Chocolate", "Donut", "French fries", "Watermelon", "Coffee"],
         animals: ["Penguin", "Elephant", "Giraffe", "Dolphin", "Kangaroo", "Panda", "Tiger", "Cat", "Dog", "Octopus", "Koala", "Lion"],
@@ -187,9 +187,17 @@
 
       let peer = null, hostConn = null, host = false, roomId = "", me = "", myId = "";
       let connections = {}, players = {}, game = {}, myVoteDone = false, timerInt = null, mySecret = null, lastPlayers = {};
-      let myGuessDone = false; // Bug 3 fix: track if guess was already submitted
+      let myGuessDone = false;
+
+      function stopTimer() {
+        if (timerInt) {
+          clearInterval(timerInt);
+          timerInt = null;
+        }
+      }
 
       function show(id) {
+        stopTimer(); // Stops ongoing timers whenever switching screens/phases
         document.querySelectorAll("section").forEach((s) => s.classList.add("hidden"));
         document.getElementById(id).classList.remove("hidden");
       }
@@ -262,7 +270,6 @@
             if (Object.keys(game.votes).length === totalVotesNeeded) finishVote();
           }
         }
-        // Bug 3 fix: ensure imposter only gets points for their first valid guess
         if (msg.type === "guess" && game.imposter === msg.from) {
           if (game.guessHandled) return;
           game.guessHandled = true;
@@ -339,6 +346,7 @@
         show("clues");
         document.getElementById("clueRound").textContent = `Round ${game.round}`;
         document.getElementById("clueStatus").textContent = isHost ? "Clues in progress. When done, open voting." : "Everyone gives one clue out loud!";
+        document.getElementById("hostTimerBtn").classList.toggle("hidden", !isHost); // Only show timer start button to host
         document.getElementById("voteOpenBtn").classList.toggle("hidden", !isHost);
       }
 
@@ -395,7 +403,15 @@
 
       function renderResult(r, isHost = false) {
         show("result");
-        myGuessDone = false; // Reset guess state
+        
+        // Reset local guess state and re-enable input field for new rounds
+        myGuessDone = false; 
+        const guessInput = document.getElementById("guessInput");
+        if (guessInput) {
+          guessInput.value = "";
+          guessInput.disabled = false;
+        }
+
         lastPlayers = Object.fromEntries(Object.entries(r.players).map(([id, name]) => [id, { name }]));
         document.getElementById("resultRound").textContent = `Round ${r.round}`;
         const impName = r.players[r.imposter];
@@ -404,7 +420,6 @@
           ? `${impName} was the Imposter! Everyone else gets 2 points.`
           : `The vote missed! ${impName} was the Imposter and gets 4 points.`;
         
-        // Bug 2 fix: Hide secret word for caught Imposter so they can't read it while guessing
         const isCaughtImposter = r.caught && myId === r.imposter;
         if (isCaughtImposter) {
           document.getElementById("resultWord").textContent = "Secret: ???";
@@ -496,7 +511,6 @@
           return;
         }
         if (msg.type === "startTimer") {
-          // Bug 1 fix: sync timer across all connected players
           runTimer(msg.seconds);
           return;
         }
@@ -548,7 +562,6 @@
         document.getElementById("voteChoices").innerHTML = "<div class='status'>✅ Vote submitted. Waiting for everyone...</div>";
       }
 
-      // Bug 3 fix: disable input/submit upon guessing
       function sendGuess() {
         if (myGuessDone) return;
         const g = document.getElementById("guessInput").value.trim();
@@ -568,7 +581,6 @@
         }
       }
 
-      // Bug 1 fix: synchronized timer handler
       function startTimer() {
         runTimer(60);
         if (host) {
@@ -579,11 +591,11 @@
       function runTimer(seconds) {
         let t = seconds;
         document.getElementById("timer").textContent = t;
-        clearInterval(timerInt);
+        stopTimer(); // Ensure previous intervals are cleared before running a new countdown
         timerInt = setInterval(() => {
           t--;
           document.getElementById("timer").textContent = t;
-          if (t <= 0) clearInterval(timerInt);
+          if (t <= 0) stopTimer();
         }, 1000);
       }
 
