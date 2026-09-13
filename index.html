@@ -133,7 +133,7 @@
           <h2>💬 Clue Time!</h2>
           <p>Everyone gives ONE clue out loud. Don't say the secret word.</p>
           <div class="timer" id="timer">60</div>
-          <button onclick="startTimer()">⏱ Start 60s</button>
+          <button id="hostTimerBtn" class="hidden" onclick="startTimer()">⏱ Start 60s</button>
           <div id="clueStatus" class="status"></div>
           <button id="voteOpenBtn" onclick="hostOpenVote()" class="hidden">🗳️ Open Voting</button>
         </section>
@@ -175,7 +175,8 @@
       </div>
     </div>
     <div id="toast"></div>
-        <script>
+
+    <script>
       const WORDS = {
         food: ["Pizza", "Burger", "Ice cream", "Sushi", "Popcorn", "Pancakes", "Tacos", "Chocolate", "Donut", "French fries", "Watermelon", "Coffee"],
         animals: ["Penguin", "Elephant", "Giraffe", "Dolphin", "Kangaroo", "Panda", "Tiger", "Cat", "Dog", "Octopus", "Koala", "Lion"],
@@ -197,7 +198,7 @@
       }
 
       function show(id) {
-        stopTimer(); // Stops ongoing timers whenever switching screens/phases
+        stopTimer();
         document.querySelectorAll("section").forEach((s) => s.classList.add("hidden"));
         document.getElementById(id).classList.remove("hidden");
       }
@@ -339,15 +340,18 @@
       function hostStartClues() {
         game.phase = "clues";
         broadcast({ type: "phase", phase: "clues", round: game.round });
-        renderClues(true);
+        renderClues();
       }
 
-      function renderClues(isHost = false) {
+      function renderClues() {
         show("clues");
         document.getElementById("clueRound").textContent = `Round ${game.round}`;
-        document.getElementById("clueStatus").textContent = isHost ? "Clues in progress. When done, open voting." : "Everyone gives one clue out loud!";
-        document.getElementById("hostTimerBtn").classList.toggle("hidden", !isHost); // Only show timer start button to host
-        document.getElementById("voteOpenBtn").classList.toggle("hidden", !isHost);
+        document.getElementById("clueStatus").textContent = host
+          ? "Clues in progress. When done, open voting."
+          : "Everyone gives one clue out loud!";
+
+        document.getElementById("hostTimerBtn").classList.toggle("hidden", !host);
+        document.getElementById("voteOpenBtn").classList.toggle("hidden", !host);
       }
 
       function hostOpenVote() {
@@ -404,7 +408,6 @@
       function renderResult(r, isHost = false) {
         show("result");
         
-        // Reset local guess state and re-enable input field for new rounds
         myGuessDone = false; 
         const guessInput = document.getElementById("guessInput");
         if (guessInput) {
@@ -506,7 +509,7 @@
         if (msg.type === "phase") {
           game.phase = msg.phase;
           if (msg.players) lastPlayers = msg.players;
-          if (msg.phase === "clues") renderClues(false);
+          if (msg.phase === "clues") renderClues();
           if (msg.phase === "vote") renderVoteClient();
           return;
         }
@@ -591,7 +594,7 @@
       function runTimer(seconds) {
         let t = seconds;
         document.getElementById("timer").textContent = t;
-        stopTimer(); // Ensure previous intervals are cleared before running a new countdown
+        stopTimer();
         timerInt = setInterval(() => {
           t--;
           document.getElementById("timer").textContent = t;
