@@ -175,8 +175,7 @@
       </div>
     </div>
     <div id="toast"></div>
-
-  <script>
+    <script>
       const WORDS = {
         food: ["Pizza", "Burger", "Ice cream", "Sushi", "Popcorn", "Pancakes", "Tacos", "Chocolate", "Donut", "French fries", "Watermelon", "Coffee"],
         animals: ["Penguin", "Elephant", "Giraffe", "Dolphin", "Kangaroo", "Panda", "Tiger", "Cat", "Dog", "Octopus", "Koala", "Lion"],
@@ -188,6 +187,7 @@
 
       let peer = null, hostConn = null, host = false, roomId = "", me = "", myId = "";
       let connections = {}, players = {}, game = {}, myVoteDone = false, timerInt = null, mySecret = null, lastPlayers = {};
+      let myGuessDone = false; // Bug 3 fix: track if guess was already submitted
 
       function show(id) {
         document.querySelectorAll("section").forEach((s) => s.classList.add("hidden"));
@@ -262,7 +262,11 @@
             if (Object.keys(game.votes).length === totalVotesNeeded) finishVote();
           }
         }
+        // Bug 3 fix: ensure imposter only gets points for their first valid guess
         if (msg.type === "guess" && game.imposter === msg.from) {
+          if (game.guessHandled) return;
+          game.guessHandled = true;
+
           const correct = String(msg.guess).trim().toLowerCase() === game.word.toLowerCase();
           if (correct) game.scores[msg.from] = (game.scores[msg.from] || 0) + 6;
           broadcast({ type: "guessResult", correct, guesser: players[msg.from]?.name });
@@ -300,7 +304,7 @@
         game.word = pool[Math.floor(Math.random() * pool.length)];
         const ids = Object.keys(players);
         game.imposter = ids[Math.floor(Math.random() * ids.length)];
-        game.votes = {}; game.phase = "reveal";
+        game.votes = {}; game.phase = "reveal"; game.guessHandled = false;
 
         Object.entries(players).forEach(([id, p]) => {
           if (!p.isHost && connections[p.peer]) {
@@ -391,6 +395,7 @@
 
       function renderResult(r, isHost = false) {
         show("result");
+        myGuessDone = false; // Reset guess state
         lastPlayers = Object.fromEntries(Object.entries(r.players).map(([id, name]) => [id, { name }]));
         document.getElementById("resultRound").textContent = `Round ${r.round}`;
         const impName = r.players[r.imposter];
@@ -398,11 +403,20 @@
         document.getElementById("resultText").textContent = r.caught
           ? `${impName} was the Imposter! Everyone else gets 2 points.`
           : `The vote missed! ${impName} was the Imposter and gets 4 points.`;
-        document.getElementById("resultWord").textContent = `Secret: ${r.word}`;
+        
+        // Bug 2 fix: Hide secret word for caught Imposter so they can't read it while guessing
+        const isCaughtImposter = r.caught && myId === r.imposter;
+        if (isCaughtImposter) {
+          document.getElementById("resultWord").textContent = "Secret: ???";
+        } else {
+          document.getElementById("resultWord").textContent = `Secret: ${r.word}`;
+        }
+
         document.getElementById("resultScores").innerHTML = Object.entries(r.scores)
           .sort((a, b) => b[1] - a[1])
           .map(([id, s]) => `<span class="pill">${clean(r.players[id])}: <b>${s}</b></span>`).join("");
-        document.getElementById("guessArea").classList.toggle("hidden", !(r.caught && myId === r.imposter));
+        
+        document.getElementById("guessArea").classList.toggle("hidden", !isCaughtImposter);
         document.getElementById("nextBtn").classList.toggle("hidden", !isHost);
       }
 
@@ -481,6 +495,11 @@
           if (msg.phase === "vote") renderVoteClient();
           return;
         }
+        if (msg.type === "startTimer") {
+          // Bug 1 fix: sync timer across all connected players
+          runTimer(msg.seconds);
+          return;
+        }
         if (msg.type === "voteProgress") {
           document.getElementById("voteProgress").textContent = `${msg.count} / ${msg.total} votes received`;
           return;
@@ -529,10 +548,16 @@
         document.getElementById("voteChoices").innerHTML = "<div class='status'>✅ Vote submitted. Waiting for everyone...</div>";
       }
 
+      // Bug 3 fix: disable input/submit upon guessing
       function sendGuess() {
+        if (myGuessDone) return;
         const g = document.getElementById("guessInput").value.trim();
         if (g) {
+          myGuessDone = true;
+          document.getElementById("guessInput").disabled = true;
           if (host) {
+            if (game.guessHandled) return;
+            game.guessHandled = true;
             const correct = g.toLowerCase() === game.word.toLowerCase();
             if (correct) game.scores["host"] = (game.scores["host"] || 0) + 6;
             broadcast({ type: "guessResult", correct, guesser: "Host" });
@@ -543,8 +568,16 @@
         }
       }
 
+      // Bug 1 fix: synchronized timer handler
       function startTimer() {
-        let t = 60;
+        runTimer(60);
+        if (host) {
+          broadcast({ type: "startTimer", seconds: 60 });
+        }
+      }
+
+      function runTimer(seconds) {
+        let t = seconds;
         document.getElementById("timer").textContent = t;
         clearInterval(timerInt);
         timerInt = setInterval(() => {
