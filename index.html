@@ -176,7 +176,7 @@
     </div>
     <div id="toast"></div>
 
-    <script>
+  <script>
       const WORDS = {
         food: ["Pizza", "Burger", "Ice cream", "Sushi", "Popcorn", "Pancakes", "Tacos", "Chocolate", "Donut", "French fries", "Watermelon", "Coffee"],
         animals: ["Penguin", "Elephant", "Giraffe", "Dolphin", "Kangaroo", "Panda", "Tiger", "Cat", "Dog", "Octopus", "Koala", "Lion"],
@@ -186,7 +186,7 @@
       };
       WORDS.mixed = [...WORDS.food, ...WORDS.animals, ...WORDS.travel, ...WORDS.movies, ...WORDS.things];
 
-      let peer = null, hostConn = null, host = false, roomId = "", me = "", myId = "host";
+      let peer = null, hostConn = null, host = false, roomId = "", me = "", myId = "";
       let connections = {}, players = {}, game = {}, myVoteDone = false, timerInt = null, mySecret = null, lastPlayers = {};
 
       function show(id) {
@@ -256,10 +256,10 @@
           if (!game.votes) game.votes = {};
           if (!game.votes[msg.from]) {
             game.votes[msg.from] = msg.target;
-            const expectedVotes = Object.keys(players).length;
-            broadcast({ type: "voteProgress", count: Object.keys(game.votes).length, total: expectedVotes });
-            document.getElementById("voteProgress").textContent = `${Object.keys(game.votes).length} / ${expectedVotes} votes received`;
-            if (Object.keys(game.votes).length === expectedVotes) finishVote();
+            const totalVotesNeeded = Object.keys(players).length;
+            broadcast({ type: "voteProgress", count: Object.keys(game.votes).length, total: totalVotesNeeded });
+            document.getElementById("voteProgress").textContent = `${Object.keys(game.votes).length} / ${totalVotesNeeded} votes received`;
+            if (Object.keys(game.votes).length === totalVotesNeeded) finishVote();
           }
         }
         if (msg.type === "guess" && game.imposter === msg.from) {
@@ -357,10 +357,10 @@
         myVoteDone = true;
         game.votes["host"] = target;
         document.getElementById("voteChoices").innerHTML = "<div class='status'>✅ Vote submitted.</div>";
-        const expectedVotes = Object.keys(players).length;
-        broadcast({ type: "voteProgress", count: Object.keys(game.votes).length, total: expectedVotes });
-        document.getElementById("voteProgress").textContent = `${Object.keys(game.votes).length} / ${expectedVotes} votes received`;
-        if (Object.keys(game.votes).length === expectedVotes) finishVote();
+        const totalVotesNeeded = Object.keys(players).length;
+        broadcast({ type: "voteProgress", count: Object.keys(game.votes).length, total: totalVotesNeeded });
+        document.getElementById("voteProgress").textContent = `${Object.keys(game.votes).length} / ${totalVotesNeeded} votes received`;
+        if (Object.keys(game.votes).length === totalVotesNeeded) finishVote();
       }
 
       function finishVote() {
@@ -409,7 +409,7 @@
       function hostNextRound() {
         if (game.round >= game.total) { finishGame(); return; }
         game.round++;
-        startHostRoun();
+        startHostRound();
       }
 
       function finishGame() {
@@ -432,7 +432,7 @@
 
         const params = new URLSearchParams(location.search);
         let code = params.get("room");
-        let hostPeer = params.get("host") || document.getElementById("joinHostId").value.trim();
+        let hostPeer = params.get("host") || (document.getElementById("joinHostId") ? document.getElementById("joinHostId").value.trim() : "");
 
         if (!hostPeer) { alert("Invalid host peer ID. Use a full game link."); return; }
 
