@@ -1,3 +1,23 @@
+const peerConfig = {
+  config: {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "stun:global.stun.twilio.com:3478?transport=udp" },
+      {
+        urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      },
+      {
+        urls: "turn:openrelay.metered.ca:443",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      }
+    ]
+  }
+};
+
 const WORDS = {
   food: ["Pizza", "Burger", "Ice cream", "Sushi", "Popcorn", "Pancakes", "Tacos", "Chocolate", "Donut", "French fries", "Watermelon", "Coffee"],
   animals: ["Penguin", "Elephant", "Giraffe", "Dolphin", "Kangaroo", "Panda", "Tiger", "Cat", "Dog", "Octopus", "Koala", "Lion"],
@@ -42,7 +62,10 @@ function makeCode() {
 function createRoom() {
   host = true; myId = "host"; roomId = makeCode(); me = "Host";
   players = { host: { id: "host", name: "Host", isHost: true } };
-  peer = new Peer("imposter-" + roomId.toLowerCase() + "-" + Math.random().toString(36).slice(2, 7));
+  
+  // Applied peerConfig here for room creation
+  peer = new Peer("imposter-" + roomId.toLowerCase() + "-" + Math.random().toString(36).slice(2, 7), peerConfig);
+  
   peer.on("open", () => {
     const link = location.href.split("?")[0] + "?room=" + encodeURIComponent(roomId) + "&host=" + encodeURIComponent(peer.id);
     document.getElementById("roomCode").textContent = roomId;
@@ -297,7 +320,10 @@ function joinRoom() {
   me = name; roomId = code || "JOINED"; host = false;
   show("lobby");
   document.getElementById("lobbyCode").textContent = roomId;
-  peer = new Peer();
+  
+  // Applied peerConfig here for client joining
+  peer = new Peer(peerConfig);
+  
   peer.on("open", () => {
     hostConn = peer.connect(hostPeer, { reliable: true });
     hostConn.on("open", () => hostConn.send({ type: "join", name }));
