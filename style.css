@@ -98,30 +98,28 @@ textarea {
   font-size: 22px;
   font-weight: 800;
 }
-.players {
+/* Optimized grid layout for up to 10 players */
+.players,
+.choices {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
   margin: 16px 0;
 }
 .player {
-  padding: 14px;
-  border-radius: 14px;
+  padding: 10px 8px;
+  border-radius: 12px;
   background: #ffffff0e;
   border: 1px solid #ffffff18;
+  font-size: 14px;
+  word-break: break-word;
+}
+.choices button {
+  background: #fff;
 }
 .timer {
   font-size: 48px;
   font-weight: 900;
-}
-.choices {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
-  margin: 16px 0;
-}
-.choices button {
-  background: #fff;
 }
 .note {
   background: #0003;
