@@ -21,7 +21,7 @@ const peerConfig = {
 // Expanded Word Bank for up to 10 Players
 const WORDS = {
   food: ["Pizza", "Burger", "Ice cream", "Sushi", "Popcorn", "Pancakes", "Tacos", "Chocolate", "Donut", "French fries", "Watermelon", "Coffee", "Ramen", "Spaghetti", "Hot dog", "Waffles", "Nachos", "Sandwich", "Steak", "Cupcake"],
-  animals: ["Penguin", "Elephant", "Giraffe", "Dolphin", "Kangaroo", "Panda", "Tiger", "Cat", "Dog", "Octopus", "Koala", "Lion", "Cheetah", "Sloth", "Flamingo", "Zebra", "Owl", "Gorilla", "Shark", "Wolf", "Koala"],
+  animals: ["Penguin", "Elephant", "Giraffe", "Dolphin", "Kangaroo", "Panda", "Tiger", "Cat", "Dog", "Octopus", "Koala", "Lion", "Cheetah", "Sloth", "Flamingo", "Zebra", "Owl", "Gorilla", "Shark", "Wolf"],
   travel: ["Airport", "Beach", "Hotel", "Passport", "Suitcase", "Cruise ship", "Mountain", "Theme park", "Train station", "Desert", "Island", "Road trip", "Campground", "Museum", "Pyramid", "Eiffel Tower", "Subway", "Airplane", "Lighthouse", "National Park"],
   movies: ["Harry Potter", "Titanic", "The Lion King", "Frozen", "Spider-Man", "Jurassic Park", "Toy Story", "The Avengers", "Shrek", "Finding Nemo", "Wednesday", "Home Alone", "Star Wars", "Batman", "Barbie", "Inception", "Moana", "The Matrix", "Aladdin", "Interstellar"],
   things: ["Umbrella", "Toothbrush", "Laptop", "Alarm clock", "Backpack", "Bicycle", "Candle", "Sunglasses", "Pillow", "Remote control", "Balloon", "Key", "Headphones", "Flashlight", "Guitar", "Water bottle", "Skateboard", "Clock", "Mirror", "Notebook"]
@@ -331,7 +331,15 @@ function joinRoom() {
     hostConn.on("data", clientMessage);
     hostConn.on("close", () => toast("Host disconnected."));
   });
-  peer.on("error", (e) => toast("Connection error: " + e.type));
+
+  peer.on("error", (e) => {
+    if (e.type === "peer-unavailable") {
+      alert("Room not found or Host has disconnected. Ask the host for a new link!");
+      show("join");
+    } else {
+      toast("Connection error: " + e.type);
+    }
+  });
 }
 
 function clientMessage(msg) {
